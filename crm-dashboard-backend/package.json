@@ -1,0 +1,35 @@
+{
+  "name": "crm-dashboard-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "pm2-runtime ecosystem.config.cjs",
+    "stop": "pm2 stop crm-backend",
+    "restart": "pm2 restart crm-backend",
+    "reload": "pm2 reload crm-backend",
+    "logs": "pm2 logs crm-backend",
+    "status": "pm2 status",
+    "seed:admin": "node scripts/seed-admin.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.14.0",
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.72.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "cron-parser": "^5.5.0",
+    "dayjs": "^1.11.20",
+    "dotenv": "^17.4.0",
+    "express": "^5.2.1",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.3.3",
+    "nodemailer": "^8.0.5"
+  }
+}
