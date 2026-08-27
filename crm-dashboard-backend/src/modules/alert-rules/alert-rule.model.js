@@ -6,7 +6,7 @@ const alertRuleSchema = new mongoose.Schema(
 
     signal: {
       type: String,
-      enum: ["status", "latency", "errorRate"],
+      enum: ["status", "latency", "errorRate", "sslExpiry"],
       required: true,
     },
 
@@ -14,6 +14,7 @@ const alertRuleSchema = new mongoose.Schema(
       statuses: { type: [String], enum: ["down", "warning"], default: [] }, // signal=status
       thresholdMs: Number, // signal=latency
       thresholdPct: Number, // signal=errorRate
+      thresholdDays: Number, // signal=sslExpiry
     },
 
     scope: {
@@ -27,6 +28,13 @@ const alertRuleSchema = new mongoose.Schema(
     },
 
     channels: [{ type: mongoose.Schema.Types.ObjectId, ref: "CRM_NotificationChannel" }],
+
+    escalation: [
+      {
+        afterMinutes: Number,
+        channels: [{ type: mongoose.Schema.Types.ObjectId, ref: "CRM_NotificationChannel" }],
+      },
+    ],
 
     severity: {
       type: String,

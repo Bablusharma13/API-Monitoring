@@ -3,8 +3,9 @@ import {
   getAllRetentionSettingsHandler,
   updateRetentionSettingHandler,
 } from "./retention.controller.js";
+import { authorize } from "../../middlewares/authorize.js";
 
 export const retentionRouter = express.Router();
 
 retentionRouter.get("/", getAllRetentionSettingsHandler);
-retentionRouter.put("/:key", updateRetentionSettingHandler);
+retentionRouter.put("/:key", authorize("admin"), updateRetentionSettingHandler);

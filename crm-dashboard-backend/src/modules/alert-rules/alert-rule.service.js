@@ -75,6 +75,7 @@ export const updateAlertRule = async (id, data) => {
     "condition",
     "scope",
     "channels",
+    "escalation",
     "severity",
     "cooldownMinutes",
     "autoResolve",

@@ -3,6 +3,7 @@ import {
   reregisterMonitorJob,
   unregisterMonitorJob,
 } from "../monitor/monitor.service.js";
+import { registerSslJob, unregisterSslJob } from "../ssl/ssl.service.js";
 import Api from "./api.model.js";
 import Check from "../check/check.model.js";
 import crypto from "crypto";
@@ -39,6 +40,10 @@ export const createApi = async (data) => {
 
   //NOTE: register BullMQ repeatable job immediately
   await registerMonitorJob(api);
+
+  if (api.ssl?.enabled) {
+    await registerSslJob(api);
+  }
 
   await sendEmailNotification({
     uniqueName: "create-api",
@@ -142,6 +147,25 @@ export const updateApi = async (id, data) => {
     await reregisterMonitorJob(updated, oldFrequency);
   }
 
+  // ── keep the SSL check job in sync with ssl.enabled / ssl.checkFrequency ──
+  const oldSslEnabled = existing?.ssl?.enabled;
+  const newSslEnabled = updated?.ssl?.enabled;
+  const oldSslFrequency = existing?.ssl?.checkFrequency;
+  const newSslFrequency = updated?.ssl?.checkFrequency;
+
+  if (!oldSslEnabled && newSslEnabled) {
+    await registerSslJob(updated);
+  } else if (oldSslEnabled && !newSslEnabled) {
+    await unregisterSslJob(updated);
+  } else if (
+    oldSslEnabled &&
+    newSslEnabled &&
+    oldSslFrequency !== newSslFrequency
+  ) {
+    await unregisterSslJob(updated);
+    await registerSslJob(updated);
+  }
+
   return updated;
 };
 
@@ -153,8 +177,14 @@ export const toggleApi = async (id, isDisabled) => {
 
   if (isDisabled) {
     await unregisterMonitorJob(api);
+    if (api.ssl?.enabled) {
+      await unregisterSslJob(api);
+    }
   } else {
     await registerMonitorJob(api);
+    if (api.ssl?.enabled) {
+      await registerSslJob(api);
+    }
   }
 
   return await Api.findByIdAndUpdate(
@@ -171,6 +201,7 @@ export const deleteApi = async (id) => {
   const api = await Api.findOne({ apiId: id });
   if (!api) return null;
   await unregisterMonitorJob(api);
+  await unregisterSslJob(api);
   return await Api.findByIdAndDelete(api._id);
 };
 
@@ -190,7 +221,12 @@ export const removeCronJob = async (id) => {
 
 export const bulkDeleteApis = async (ids) => {
   const apis = await Api.find({ _id: { $in: ids } });
-  await Promise.all(apis.map((api) => unregisterMonitorJob(api)));
+  await Promise.all(
+    apis.map(async (api) => {
+      await unregisterMonitorJob(api);
+      await unregisterSslJob(api);
+    }),
+  );
   const foundIds = apis.map((api) => api.apiId);
   await Api.deleteMany({ apiId: { $in: foundIds } });
   return {

@@ -12,10 +12,18 @@ import {
   runNow,
 } from "./cron-job.service.js";
 import { successsResponse, errorResponse } from "../../utils/responses.js";
+import { recordAudit } from "../audit-log/audit-log.service.js";
 
 export const createHandler = async (req, res, next) => {
   try {
     const job = await createCronJob(req.body);
+    await recordAudit({
+      req,
+      action: "cronJob.create",
+      entityType: "CronJob",
+      entityId: job._id,
+      summary: `Created cron job "${job.name}"`,
+    });
     return successsResponse(res, job);
   } catch (err) {
     next(err);
@@ -45,6 +53,13 @@ export const updateHandler = async (req, res, next) => {
   try {
     const job = await updateCronJob(req.params.id, req.body);
     if (!job) return errorResponse(res, "Cron job not found", 404);
+    await recordAudit({
+      req,
+      action: "cronJob.update",
+      entityType: "CronJob",
+      entityId: job._id,
+      summary: `Updated cron job "${job.name}"`,
+    });
     return successsResponse(res, job, 200, "Cron job updated");
   } catch (err) {
     next(err);
@@ -55,6 +70,13 @@ export const deleteHandler = async (req, res, next) => {
   try {
     const job = await deleteCronJob(req.params.id);
     if (!job) return errorResponse(res, "Cron job not found", 404);
+    await recordAudit({
+      req,
+      action: "cronJob.delete",
+      entityType: "CronJob",
+      entityId: job._id,
+      summary: `Deleted cron job "${job.name}"`,
+    });
     return successsResponse(res, job, 200, "Cron job deleted");
   } catch (err) {
     next(err);
@@ -65,6 +87,13 @@ export const toggleHandler = async (req, res, next) => {
   try {
     const job = await toggleCronJob(req.params.id);
     if (!job) return errorResponse(res, "Cron job not found", 404);
+    await recordAudit({
+      req,
+      action: "cronJob.toggle",
+      entityType: "CronJob",
+      entityId: job._id,
+      summary: `${job.isPaused ? "Paused" : "Resumed"} cron job "${job.name}"`,
+    });
     return successsResponse(res, job);
   } catch (err) {
     next(err);
@@ -118,6 +147,13 @@ export const runNowHandler = async (req, res, next) => {
   try {
     const job = await runNow(req.params.id);
     if (!job) return errorResponse(res, "Cron job not found", 404);
+    await recordAudit({
+      req,
+      action: "cronJob.runNow",
+      entityType: "CronJob",
+      entityId: job._id,
+      summary: `Triggered manual run for cron job "${job.name}"`,
+    });
     return successsResponse(res, job);
   } catch (err) {
     next(err);

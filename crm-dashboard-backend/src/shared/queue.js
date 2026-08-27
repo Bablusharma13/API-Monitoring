@@ -18,3 +18,30 @@ export const cronSchedulerQueue = new Queue("cron-scheduler", {
     removeOnFail: false,
   },
 });
+
+export const alertEscalationQueue = new Queue("alert-escalation", {
+  connection: redis,
+  defaultJobOptions: {
+    removeOnComplete: true,
+    removeOnFail: true,
+  },
+});
+
+export const sslCheckQueue = new Queue("ssl-check", {
+  connection: redis,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "fixed", delay: 5000 },
+    removeOnComplete: 20,
+    removeOnFail: 50,
+  },
+});
+
+export const syntheticTransactionQueue = new Queue("synthetic-transaction", {
+  connection: redis,
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: 50,
+    removeOnFail: 100,
+  },
+});

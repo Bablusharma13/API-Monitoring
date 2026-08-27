@@ -3,6 +3,7 @@ import Alert from "./alert.model.js";
 import AlertRule from "../alert-rules/alert-rule.model.js";
 import NotificationChannel from "../notification-channels/notification-channel.model.js";
 import { sendAlertEmail } from "../../shared/mailer.js";
+import { alertEscalationQueue } from "../../shared/queue.js";
 
 const toFilter = (val) => {
   const arr = val.split(",").map((v) => v.trim()).filter(Boolean);
@@ -63,6 +64,52 @@ const dispatchToRuleChannels = async (rule, alert) => {
   }
 };
 
+// ── escalation scheduling ────────────────────────────────────
+// Adds one delayed BullMQ job per escalation tier configured on `rule`, each
+// keyed by a predictable job id so a specific tier's job can be looked up
+// (and cancelled) later via `cancelPendingEscalations`.
+export const scheduleEscalations = async (rule, alert) => {
+  if (!rule?.escalation?.length) return;
+
+  for (let tierIndex = 0; tierIndex < rule.escalation.length; tierIndex++) {
+    const tier = rule.escalation[tierIndex];
+    if (!tier?.afterMinutes || tier.afterMinutes <= 0) continue;
+
+    await alertEscalationQueue.add(
+      "escalate",
+      { alertId: alert._id.toString(), tierIndex },
+      {
+        delay: tier.afterMinutes * 60000,
+        jobId: `escalate-${alert._id}-${tierIndex}`,
+      },
+    );
+  }
+};
+
+// ── escalation cancellation ──────────────────────────────────
+// Best-effort removal of any still-pending escalation jobs for `alert`
+// (called on ack/resolve). Tiers that already fired (tracked in
+// `alert.escalatedTiers`) are skipped, and every removal attempt is
+// individually guarded so a missing/already-processed job never throws.
+export const cancelPendingEscalations = async (alert) => {
+  const rule = await AlertRule.findById(alert.rule);
+  if (!rule?.escalation?.length) return;
+
+  for (let tierIndex = 0; tierIndex < rule.escalation.length; tierIndex++) {
+    if (alert.escalatedTiers?.includes(tierIndex)) continue;
+
+    try {
+      const job = await alertEscalationQueue.getJob(`escalate-${alert._id}-${tierIndex}`);
+      if (job) await job.remove();
+    } catch (error) {
+      console.error(
+        `cancelPendingEscalations: failed to remove tier ${tierIndex} job for alert ${alert._id}:`,
+        error?.message,
+      );
+    }
+  }
+};
+
 // ── evaluateStatusAlerts ─────────────────────────────────────
 // Called by the monitor pipeline whenever an API's status transitions
 // (previousStatus -> newStatus). Never throws — logs and swallows errors so
@@ -107,6 +154,7 @@ export const evaluateStatusAlerts = async (api, previousStatus, newStatus, resul
       });
 
       await dispatchToRuleChannels(rule, alert);
+      await scheduleEscalations(rule, alert);
     }
   } catch (error) {
     console.error("evaluateStatusAlerts error:", error);
@@ -166,9 +214,53 @@ export const evaluateMetricAlerts = async (api, { responseTimeMs, errorRatePct }
       });
 
       await dispatchToRuleChannels(rule, alert);
+      await scheduleEscalations(rule, alert);
     }
   } catch (error) {
     console.error("evaluateMetricAlerts error:", error);
+  }
+};
+
+// ── evaluateSslAlerts ─────────────────────────────────────────
+// Called by the SSL-check pipeline with the number of days remaining until
+// an API's TLS certificate expires. Never throws.
+export const evaluateSslAlerts = async (api, daysUntilExpiry) => {
+  try {
+    const rules = await AlertRule.find({ enabled: true, signal: "sslExpiry" });
+    if (!rules.length) return;
+
+    for (const rule of rules) {
+      if (!ruleMatchesApi(rule, api)) continue;
+
+      if (rule.condition?.thresholdDays == null) continue;
+      if (!(daysUntilExpiry <= rule.condition.thresholdDays)) continue;
+
+      const existing = await Alert.findOne({
+        rule: rule._id,
+        api: api._id,
+        status: "firing",
+      });
+
+      if (withinCooldown(rule, existing)) continue;
+
+      const alert = await Alert.create({
+        rule: rule._id,
+        api: api._id,
+        incident: null,
+        severity: rule.severity,
+        title: `${api.name} — SSL certificate expiring soon`,
+        message: `${api.name} SSL certificate expires in ${daysUntilExpiry} day(s), at or below the ${rule.condition.thresholdDays}-day threshold.`,
+        status: "firing",
+        triggeredAt: new Date(),
+        value: daysUntilExpiry,
+        threshold: rule.condition.thresholdDays,
+      });
+
+      await dispatchToRuleChannels(rule, alert);
+      await scheduleEscalations(rule, alert);
+    }
+  } catch (error) {
+    console.error("evaluateSslAlerts error:", error);
   }
 };
 
@@ -335,7 +427,15 @@ export const ackAlert = async (id, by) => {
   alert.acknowledgedAt = new Date();
   alert.acknowledgedBy = by;
 
-  return await alert.save();
+  const saved = await alert.save();
+
+  try {
+    await cancelPendingEscalations(saved);
+  } catch (error) {
+    console.error(`ackAlert: cancelPendingEscalations failed for alert ${id}:`, error?.message);
+  }
+
+  return saved;
 };
 
 export const resolveAlert = async (id) => {
@@ -345,5 +445,13 @@ export const resolveAlert = async (id) => {
   alert.status = "resolved";
   alert.resolvedAt = new Date();
 
-  return await alert.save();
+  const saved = await alert.save();
+
+  try {
+    await cancelPendingEscalations(saved);
+  } catch (error) {
+    console.error(`resolveAlert: cancelPendingEscalations failed for alert ${id}:`, error?.message);
+  }
+
+  return saved;
 };

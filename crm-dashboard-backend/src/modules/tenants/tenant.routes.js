@@ -17,6 +17,7 @@ import {
   getEndpointTenantMetrics,
   getQuotaUsageHandler,
 } from "./tenant.controller.js";
+import { authorize } from "../../middlewares/authorize.js";
 
 export const tenantRouter = express.Router();
 
@@ -39,7 +40,7 @@ tenantRouter.get(
 );
 
 tenantRouter.get("/:id", getTenantDetails);
-tenantRouter.patch("/:id/origin", updateTenantOriginHandler);
+tenantRouter.patch("/:id/origin", authorize("admin"), updateTenantOriginHandler);
 tenantRouter.get("/:id/employees", getTenantEmployees);
 tenantRouter.get("/:id/endpoint-matrics", getTenantEndpointMatrics);
 tenantRouter.get("/:id/request-log", getTenantRequestLog);

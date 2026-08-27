@@ -4,6 +4,7 @@ import {
 } from "./retention.service.js";
 import { RETENTION_KEYS } from "./retention-setting.model.js";
 import { successsResponse, errorResponse } from "../../utils/responses.js";
+import { recordAudit } from "../audit-log/audit-log.service.js";
 
 export const getAllRetentionSettingsHandler = async (req, res) => {
   try {
@@ -47,6 +48,13 @@ export const updateRetentionSettingHandler = async (req, res) => {
       updatedBy,
       !!applyRetroactively,
     );
+    await recordAudit({
+      req,
+      action: "retentionSetting.update",
+      entityType: "RetentionSetting",
+      entityId: key,
+      summary: `Updated retention setting "${key}" to ${valueDays} day(s)${applyRetroactively ? " (applied retroactively)" : ""}`,
+    });
     return successsResponse(
       res,
       result,

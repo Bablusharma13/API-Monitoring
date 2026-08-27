@@ -24,6 +24,8 @@ const alertSchema = new mongoose.Schema(
     value: Number,
     threshold: Number,
 
+    escalatedTiers: { type: [Number], default: [] },
+
     notifiedChannels: [
       {
         channel: { type: mongoose.Schema.Types.ObjectId, ref: "CRM_NotificationChannel" },

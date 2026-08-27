@@ -10,6 +10,7 @@ import {
   getApiSummaryHandler,
   removeCronJobHandler,
 } from "./api.controller.js";
+import { authorize } from "../../middlewares/authorize.js";
 
 export const apiRouter = express.Router();
 
@@ -19,6 +20,6 @@ apiRouter.get("/summary", getApiSummaryHandler);
 apiRouter.get("/:id", getApiByIdHandler);
 apiRouter.put("/:id", updateApiHandler);
 apiRouter.patch("/:id", toggleApiHandler);
-apiRouter.delete("/bulk", bulkDeleteApisHandler);
-apiRouter.delete("/:id/cron", removeCronJobHandler);
-apiRouter.delete("/:id", deleteApiHandler);
+apiRouter.delete("/bulk", authorize("admin"), bulkDeleteApisHandler);
+apiRouter.delete("/:id/cron", authorize("admin"), removeCronJobHandler);
+apiRouter.delete("/:id", authorize("admin"), deleteApiHandler);

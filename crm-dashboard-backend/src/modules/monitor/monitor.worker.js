@@ -8,12 +8,24 @@ import { handleStatusChange } from "./monitor.service.js";
 import { syncCategoryStats } from "../categories/category.service.js";
 import { evaluateMetricAlerts } from "../alerts/alert.service.js";
 import { getRetentionDays } from "../retention/retention.service.js";
+import { evaluateAssertions } from "../../shared/assertions.js";
+
+// With only one worker process running, every configured region's check job
+// executes on this same physical machine and network path — the `region`
+// label recorded on each Check document reflects configured intent for
+// future multi-worker deployments, not measured geographic diversity, until
+// a second worker process is deployed elsewhere with a different
+// MONITOR_REGION value pointed at the same Redis and MongoDB.
+const MONITOR_REGION = process.env.MONITOR_REGION || "default";
 
 export const startMonitorWorker = () => {
   const worker = new Worker(
     "api-monitor",
     async (job) => {
-      const { apiId } = job.data;
+      const { apiId, region } = job.data;
+      // The job's configured region (not MONITOR_REGION) is what gets
+      // recorded on the Check document — see note above.
+      const checkRegion = region || "default";
       const api = await apiModel.findById(apiId).populate("owner");
 
       if (!api || !api.monitoring.enabled) {
@@ -21,7 +33,9 @@ export const startMonitorWorker = () => {
         return { skipped: true };
       }
 
-      console.log(`Checking ${api.name}...`);
+      console.log(
+        `Checking ${api.name}... (region: ${checkRegion}, worker: ${MONITOR_REGION})`,
+      );
 
       // ── ping the API ────────────────────
       const start = Date.now();
@@ -54,6 +68,18 @@ export const startMonitorWorker = () => {
           responseTime: Date.now() - start,
           message: `${api.request.method} ${new URL(api.request.url).pathname} — ${response.status} OK`,
         };
+
+        // ── run response assertions (if configured) ──
+        if (api.assertions?.enabled) {
+          const { passed, failures } = evaluateAssertions(
+            api.assertions,
+            response.data,
+          );
+          if (!passed) {
+            result.assertionsPassed = false;
+            result.assertionFailures = failures;
+          }
+        }
       } catch (err) {
         result = {
           success: false,
@@ -70,7 +96,7 @@ export const startMonitorWorker = () => {
       const previousStatus = api.status.current;
 
       const [, statsResult] = await Promise.all([
-        writeCheck(api, result, newStatus),
+        writeCheck(api, result, newStatus, checkRegion),
         //NOTE: need to add this
         // writeLog(api, result),
         updateApiStats(api, result, newStatus),
@@ -127,6 +153,7 @@ const computeStatus = (result, api) => {
   if (result.statusCode !== (api.monitoring.expectedStatus || 200))
     return "warning";
   if (result.responseTime > api.monitoring.timeout) return "warning";
+  if (result.assertionsPassed === false) return "warning";
   return "active";
 };
 
@@ -138,7 +165,7 @@ const getCheckStatus = (newStatus, result) => {
   return "error";
 };
 
-const writeCheck = async (api, result, newStatus) => {
+const writeCheck = async (api, result, newStatus, region) => {
   try {
     let retentionDays = 90;
     try {
@@ -151,6 +178,11 @@ const writeCheck = async (api, result, newStatus) => {
       );
     }
 
+    const assertionSummary =
+      result.assertionsPassed === false && result.assertionFailures?.length
+        ? `Assertion failures: ${result.assertionFailures.join("; ")}`
+        : null;
+
     await checkModel.create({
       api: api._id,
       apiName: api.name,
@@ -158,8 +190,11 @@ const writeCheck = async (api, result, newStatus) => {
       status: getCheckStatus(newStatus, result),
       statusCode: result.statusCode,
       responseTime: result.responseTime,
-      message: result.message,
-      error: result.error || null,
+      region: region || "default",
+      message: assertionSummary
+        ? `${result.message} — ${assertionSummary}`
+        : result.message,
+      error: result.error || (assertionSummary ? assertionSummary : null),
       expiresAt: dayjs().add(retentionDays, "days").toDate(),
     });
   } catch (e) {

@@ -12,6 +12,7 @@ import {
   recordPingHandler,
   runNowHandler,
 } from "./cron-job.controller.js";
+import { authorize } from "../../middlewares/authorize.js";
 
 export const cronJobRouter = Router();
 export const pingRouter = Router();
@@ -21,7 +22,7 @@ cronJobRouter.get("/", getAllHandler);
 cronJobRouter.get("/:id", getByIdHandler);
 cronJobRouter.post("/", createHandler);
 cronJobRouter.put("/:id", updateHandler);
-cronJobRouter.delete("/:id", deleteHandler);
+cronJobRouter.delete("/:id", authorize("admin"), deleteHandler);
 cronJobRouter.patch("/:id/toggle", toggleHandler);
 cronJobRouter.get("/:id/pings/summary", getPingStatsHandler);
 cronJobRouter.get("/:id/pings", getPingHistoryHandler);

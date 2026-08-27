@@ -63,6 +63,7 @@ const apiSchema = new mongoose.Schema(
       lastCheckedAt: Date,
       nextCheckAt: Date,
       assignedAt: { type: Date, default: Date.now },
+      regions: { type: [String], default: ["default"] },
     },
 
     // live status — updated on every check
@@ -90,6 +91,38 @@ const apiSchema = new mongoose.Schema(
       peakResponse30d: { type: Number, default: 0 },
       totalIncidents: { type: Number, default: 0 },
       riskScore: { type: Number, default: 0 },
+    },
+
+    // ssl certificate monitoring
+    ssl: {
+      enabled: { type: Boolean, default: false },
+      checkFrequency: { type: String, default: "0 6 * * *" },
+      lastCheckedAt: Date,
+      expiresAt: Date,
+      daysUntilExpiry: Number,
+      issuer: String,
+      status: {
+        type: String,
+        enum: ["ok", "warning", "critical", "error"],
+        default: "ok",
+      },
+    },
+
+    // response assertions
+    assertions: {
+      enabled: { type: Boolean, default: false },
+      bodyContains: { type: [String], default: [] },
+      jsonPathChecks: [
+        {
+          path: String,
+          expected: { type: mongoose.Schema.Types.Mixed },
+          operator: {
+            type: String,
+            enum: ["equals", "exists", "contains", "gt", "lt"],
+            default: "equals",
+          },
+        },
+      ],
     },
 
     // alerts

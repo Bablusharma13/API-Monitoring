@@ -18,6 +18,7 @@ import {
 } from "./tenant.service.js";
 
 import { successsResponse, errorResponse } from "../../utils/responses.js";
+import { recordAudit } from "../audit-log/audit-log.service.js";
 
 export const getTenantDetails = async (req, res) => {
   const { id } = req.params;
@@ -214,6 +215,13 @@ export const updateTenantOriginHandler = async (req, res) => {
   const { origin } = req.body;
   try {
     const data = await updateTenantOrigin(id, origin);
+    await recordAudit({
+      req,
+      action: "tenant.updateOrigin",
+      entityType: "Tenant",
+      entityId: id,
+      summary: `Updated allowed origin(s) for tenant "${data?.company || id}" to [${Array.isArray(origin) ? origin.join(", ") : origin}]`,
+    });
     return successsResponse(res, data);
   } catch (error) {
     return errorResponse(res, error);

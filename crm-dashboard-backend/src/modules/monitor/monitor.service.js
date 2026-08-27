@@ -6,29 +6,41 @@ import incidentModel, {
 import dayjs from "dayjs";
 import { sendEmailNotification } from "../../shared/mailer.js";
 import { evaluateStatusAlerts } from "../alerts/alert.service.js";
+import { isApiInMaintenance } from "../maintenance-windows/maintenance-window.service.js";
+
+const getApiRegions = (api) => {
+  const regions = api.monitoring?.regions;
+  return Array.isArray(regions) && regions.length > 0 ? regions : ["default"];
+};
 
 export const unregisterMonitorJob = async (api) => {
   const repeatableJobs = await monitorQueue.getRepeatableJobs();
-  const job = repeatableJobs.find((j) => j.name === `check-${api._id}`);
+  const prefix = `check-${api._id}-`;
+  const legacyName = `check-${api._id}`;
+  const matches = repeatableJobs.filter(
+    (j) => j.name.startsWith(prefix) || j.name === legacyName,
+  );
 
-  if (job) {
-    await monitorQueue.removeRepeatableByKey(job.key);
-    console.log(`Unregistered monitor job for ${api.name}`);
+  if (matches.length > 0) {
+    await Promise.all(
+      matches.map((job) => monitorQueue.removeRepeatableByKey(job.key)),
+    );
+    console.log(
+      `Unregistered ${matches.length} monitor job(s) for ${api.name}`,
+    );
   } else {
     console.warn(`No repeatable job found for ${api.name}`);
   }
 };
 
 export const reregisterMonitorJob = async (api, oldFrequency) => {
-  await monitorQueue.removeRepeatable(`check-${api._id}`, {
-    pattern: oldFrequency,
-  });
+  await unregisterMonitorJob(api);
   await registerMonitorJob(api);
 };
 
 export const syncMonitorJobs = async () => {
   const registeredJobs = await monitorQueue.getRepeatableJobs();
-  const registeredIds = new Set(registeredJobs.map((j) => j.name));
+  const registeredNames = new Set(registeredJobs.map((j) => j.name));
 
   const apis = await apiModel.find({
     isDisabled: false,
@@ -36,8 +48,12 @@ export const syncMonitorJobs = async () => {
 
   let synced = 0;
   for (const api of apis) {
-    const jobName = `check-${api._id}`;
-    if (!registeredIds.has(jobName)) {
+    const regions = getApiRegions(api);
+    const missingRegion = regions.some(
+      (region) => !registeredNames.has(`check-${api._id}-${region}`),
+    );
+
+    if (missingRegion) {
       await registerMonitorJob(api);
       synced++;
     }
@@ -49,26 +65,31 @@ export const syncMonitorJobs = async () => {
 };
 
 export const registerMonitorJob = async (api) => {
-  await monitorQueue.add(
-    `check-${api._id}`,
-    { apiId: api._id.toString() },
-    {
-      repeat: {
-        pattern: api.monitoring.frequency,
+  const regions = getApiRegions(api);
+
+  for (const region of regions) {
+    const jobId = `check-${api._id}-${region}`;
+    await monitorQueue.add(
+      jobId,
+      { apiId: api._id.toString(), region },
+      {
+        repeat: {
+          pattern: api.monitoring.frequency,
+        },
+        jobId,
+        attempts: 2,
+        backoff: {
+          type: "fixed",
+          delay: 5000,
+        },
+        removeOnComplete: 50,
+        removeOnFail: 100,
       },
-      jobId: `check-${api._id}`,
-      attempts: 2,
-      backoff: {
-        type: "fixed",
-        delay: 5000,
-      },
-      removeOnComplete: 50,
-      removeOnFail: 100,
-    },
-  );
+    );
+  }
 
   console.log(
-    `Registered monitor job for ${api.name} — ${api.monitoring.frequency}`,
+    `Registered monitor job(s) for ${api.name} — ${api.monitoring.frequency} — regions: ${regions.join(", ")}`,
   );
 };
 
@@ -87,6 +108,14 @@ export const handleStatusChange = async (
   newStatus,
   result,
 ) => {
+  const inMaintenance = await isApiInMaintenance(api);
+  if (inMaintenance) {
+    console.log(
+      `${api.name} is in a maintenance window — suppressing incident/alert side-effects`,
+    );
+    return;
+  }
+
   let incident = null;
   try {
     console.log(`${api.name} status changed: ${previousStatus} → ${newStatus}`);

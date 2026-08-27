@@ -7,12 +7,13 @@ import {
   deleteNotificationChannelHandler,
   testNotificationChannelHandler,
 } from "./notification-channel.controller.js";
+import { authorize } from "../../middlewares/authorize.js";
 
 export const notificationChannelRouter = express.Router();
 
 notificationChannelRouter.get("/", getAllNotificationChannelsHandler);
-notificationChannelRouter.post("/", createNotificationChannelHandler);
+notificationChannelRouter.post("/", authorize("admin"), createNotificationChannelHandler);
 notificationChannelRouter.post("/:id/test", testNotificationChannelHandler);
 notificationChannelRouter.get("/:id", getNotificationChannelByIdHandler);
-notificationChannelRouter.put("/:id", updateNotificationChannelHandler);
-notificationChannelRouter.delete("/:id", deleteNotificationChannelHandler);
+notificationChannelRouter.put("/:id", authorize("admin"), updateNotificationChannelHandler);
+notificationChannelRouter.delete("/:id", authorize("admin"), deleteNotificationChannelHandler);

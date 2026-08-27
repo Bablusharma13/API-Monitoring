@@ -23,7 +23,7 @@ const incidentSchema = new mongoose.Schema(
     title: String,
     type: {
       type: String,
-      enum: ["down", "high_latency", "ssl_error", "timeout"],
+      enum: ["down", "high_latency", "ssl_error", "timeout", "transaction_failed"],
     },
     severity: { type: String, enum: ["critical", "warning", "info"] },
     status: {

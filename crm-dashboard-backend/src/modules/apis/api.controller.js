@@ -10,10 +10,18 @@ import {
   removeCronJob,
 } from "./api.service.js";
 import { successsResponse, errorResponse } from "../../utils/responses.js";
+import { recordAudit } from "../audit-log/audit-log.service.js";
 
 export const createApiHandler = async (req, res) => {
   try {
     const api = await createApi(req.body);
+    await recordAudit({
+      req,
+      action: "api.create",
+      entityType: "Api",
+      entityId: api?._id,
+      summary: `API "${api?.name ?? api?._id}" created`,
+    });
     return successsResponse(res, api, 201, "API created successfully");
   } catch (error) {
     return errorResponse(res, error);
@@ -47,6 +55,13 @@ export const updateApiHandler = async (req, res) => {
     if (!api) {
       return errorResponse(res, { message: "API not found" }, 404);
     }
+    await recordAudit({
+      req,
+      action: "api.update",
+      entityType: "Api",
+      entityId: api._id,
+      summary: `API "${api.name ?? api._id}" updated`,
+    });
     return successsResponse(res, api, 200, "API updated successfully");
   } catch (error) {
     return errorResponse(res, error);
@@ -60,6 +75,13 @@ export const toggleApiHandler = async (req, res) => {
     if (!api) {
       return errorResponse(res, { message: "API not found" }, 404);
     }
+    await recordAudit({
+      req,
+      action: "api.toggle",
+      entityType: "Api",
+      entityId: api._id,
+      summary: `API "${api.name ?? api._id}" ${isDisabled ? "disabled" : "enabled"}`,
+    });
     return successsResponse(
       res,
       api,
@@ -77,6 +99,13 @@ export const deleteApiHandler = async (req, res) => {
     if (!api) {
       return errorResponse(res, { message: "API not found" }, 404);
     }
+    await recordAudit({
+      req,
+      action: "api.delete",
+      entityType: "Api",
+      entityId: api._id,
+      summary: `API "${api.name ?? api._id}" deleted`,
+    });
     return successsResponse(res, api);
   } catch (error) {
     return errorResponse(res, error);
@@ -95,6 +124,13 @@ export const bulkDeleteApisHandler = async (req, res) => {
       );
     }
     const result = await bulkDeleteApis(ids);
+    await recordAudit({
+      req,
+      action: "api.bulkDelete",
+      entityType: "Api",
+      entityId: String(ids.length),
+      summary: `${ids.length} API(s) deleted`,
+    });
     return successsResponse(res, result, 200, "APIs deleted successfully");
   } catch (error) {
     return errorResponse(res, error);
@@ -107,6 +143,13 @@ export const removeCronJobHandler = async (req, res) => {
     if (!api) {
       return errorResponse(res, { message: "API not found" }, 404);
     }
+    await recordAudit({
+      req,
+      action: "api.removeCronJob",
+      entityType: "Api",
+      entityId: api._id,
+      summary: `Cron job removed from API "${api.name ?? api._id}"`,
+    });
     return successsResponse(res, api, 200, "Cron job removed successfully");
   } catch (error) {
     return errorResponse(res, error);

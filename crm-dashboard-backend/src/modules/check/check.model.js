@@ -9,6 +9,7 @@ const checkSchema = new mongoose.Schema({
   responseTime: Number,
   message: String,
   error: String,
+  region: { type: String, default: "default" },
   expiresAt: Date,
 });
 
