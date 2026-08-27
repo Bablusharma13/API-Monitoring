@@ -5,6 +5,7 @@ import incidentModel, {
 } from "../incident/incident.model.js";
 import dayjs from "dayjs";
 import { sendEmailNotification } from "../../shared/mailer.js";
+import { evaluateStatusAlerts } from "../alerts/alert.service.js";
 
 export const unregisterMonitorJob = async (api) => {
   const repeatableJobs = await monitorQueue.getRepeatableJobs();
@@ -86,22 +87,30 @@ export const handleStatusChange = async (
   newStatus,
   result,
 ) => {
+  let incident = null;
   try {
     console.log(`${api.name} status changed: ${previousStatus} → ${newStatus}`);
 
     if (newStatus === "down" || newStatus === "warning") {
       if (previousStatus === "active" || previousStatus === "unknown") {
-        await handleDown(api, newStatus, result);
+        incident = await handleDown(api, newStatus, result);
       }
     }
 
     if (newStatus === "active") {
       if (previousStatus === "down" || previousStatus === "warning") {
-        await handleRecovered(api);
+        incident = await handleRecovered(api);
       }
     }
   } catch (e) {
     console.log("error", e.stack);
+  }
+
+  // ── status-based alert rules ──────────────
+  try {
+    await evaluateStatusAlerts(api, previousStatus, newStatus, result, incident);
+  } catch (e) {
+    console.error(`evaluateStatusAlerts failed for ${api.name}:`, e.message);
   }
 };
 
@@ -193,6 +202,8 @@ const handleDown = async (api, newStatus, result) => {
   } catch (err) {
     console.error(`Failed to send alert email for ${api.name}:`, err.message);
   }
+
+  return incident || null;
 };
 
 const handleRecovered = async (api) => {
@@ -207,7 +218,7 @@ const handleRecovered = async (api) => {
 
     if (!openIncident) {
       console.log(`No open incident found for ${api.name} — skipping resolve`);
-      return;
+      return null;
     }
 
     // ── 2. compute downtime ──────────────────
@@ -300,4 +311,6 @@ const handleRecovered = async (api) => {
       err.message,
     );
   }
+
+  return openIncident || null;
 };

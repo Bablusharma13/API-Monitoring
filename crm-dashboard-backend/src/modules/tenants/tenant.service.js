@@ -947,14 +947,135 @@ export const getTenantEmployeeMetricsById = async (
 };
 
 export const getTenantsSummary = async () => {
-  const total = await Tenant.countDocuments();
+  const now = new Date();
+  const since24h = new Date(now - 24 * 60 * 60 * 1000);
+  const since30d = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
-  return {
-    total,
-    healthy: total,
-    warning: 0,
-    critical: 0,
-  };
+  const tenants = await Tenant.find({}, "_id").lean();
+  const total = tenants.length;
+
+  const counts = { total, healthy: 0, warning: 0, critical: 0, noData: 0 };
+
+  if (total === 0) return counts;
+
+  const tenantIds = tenants.map((t) => t._id);
+
+  const [metrics24h, metrics30d] = await Promise.all([
+    TenantMetric.aggregate([
+      {
+        $match: {
+          tenantId: { $in: tenantIds },
+          recordedAt: { $gte: since24h },
+        },
+      },
+      {
+        $group: {
+          _id: "$tenantId",
+          errorRate: { $avg: "$errorRate" },
+        },
+      },
+    ]),
+
+    TenantMetric.aggregate([
+      {
+        $match: {
+          tenantId: { $in: tenantIds },
+          recordedAt: { $gte: since30d },
+        },
+      },
+      {
+        $group: {
+          _id: "$tenantId",
+          totalRequests: { $sum: "$totalRequests" },
+          totalErrors: { $sum: "$totalErrors" },
+        },
+      },
+    ]),
+  ]);
+
+  const map24h = Object.fromEntries(
+    metrics24h.map((m) => [m._id.toString(), m]),
+  );
+  const map30d = Object.fromEntries(
+    metrics30d.map((m) => [m._id.toString(), m]),
+  );
+
+  for (const tenant of tenants) {
+    const key = tenant._id.toString();
+    const m30 = map30d[key];
+
+    // No TenantMetric records in the last 30 days — can't classify status.
+    if (!m30 || !m30.totalRequests) {
+      counts.noData += 1;
+      continue;
+    }
+
+    const m24 = map24h[key] || {};
+
+    const uptime30d = Number(
+      (((m30.totalRequests - m30.totalErrors) / m30.totalRequests) * 100).toFixed(2),
+    );
+    const errorRate24h = Number(((m24.errorRate ?? 0) * 100).toFixed(1));
+
+    const status = deriveStatus(uptime30d, errorRate24h);
+    counts[status] += 1;
+  }
+
+  return counts;
+};
+
+const PLAN_QUOTAS = {
+  starter: 100000,
+  business: 1000000,
+  enterprise: 10000000,
+};
+
+export const getQuotaUsage = async () => {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const tenants = await Tenant.find({}, "name company plan quota").lean();
+  if (!tenants.length) return [];
+
+  const tenantIds = tenants.map((t) => t._id);
+
+  const usage = await TenantMetric.aggregate([
+    {
+      $match: {
+        tenantId: { $in: tenantIds },
+        recordedAt: { $gte: startOfMonth, $lt: startOfNextMonth },
+      },
+    },
+    {
+      $group: {
+        _id: "$tenantId",
+        usedThisMonth: { $sum: "$totalRequests" },
+      },
+    },
+  ]);
+
+  const usageMap = Object.fromEntries(
+    usage.map((u) => [u._id.toString(), u.usedThisMonth]),
+  );
+
+  return tenants.map((tenant) => {
+    const key = tenant._id.toString();
+    const usedThisMonth = usageMap[key] || 0;
+    const monthCap = tenant.quota?.requestsPerMonth ?? PLAN_QUOTAS[tenant.plan];
+
+    return {
+      tenantId: tenant._id,
+      tenantName: tenant.company || tenant.name,
+      plan: tenant.plan,
+      monthCap,
+      usedThisMonth,
+      usedPct: monthCap
+        ? Number(((usedThisMonth / monthCap) * 100).toFixed(2))
+        : null,
+      rateLimitPerMinute: tenant.quota?.rateLimitPerMinute ?? null,
+    };
+  });
 };
 
 export const getFleetSummary = async () => {

@@ -4,6 +4,7 @@ import {
   getCategorySummary,
   bulkDeleteCategories,
   deleteCategoryById,
+  updateCategory,
 } from "./category.service.js";
 import { successsResponse, errorResponse } from "../../utils/responses.js";
 
@@ -52,6 +53,15 @@ export const bulkDeleteCategoriesHandler = async (req, res) => {
       200,
       "Categories deleted successfully",
     );
+  } catch (error) {
+    return errorResponse(res, error);
+  }
+};
+
+export const updateCategoryHandler = async (req, res) => {
+  try {
+    const category = await updateCategory(req.params.id, req.body);
+    return successsResponse(res, category, 200, "Category updated successfully");
   } catch (error) {
     return errorResponse(res, error);
   }

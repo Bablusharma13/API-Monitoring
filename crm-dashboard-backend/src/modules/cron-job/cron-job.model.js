@@ -56,10 +56,14 @@ const cronJobSchema = new mongoose.Schema(
       avgDuration24h: { type: Number, default: 0 },
       avgDuration7d: { type: Number, default: 0 },
       avgDuration30d: { type: Number, default: 0 },
+      totalRuns30d: { type: Number, default: 0 },
     },
 
     pingUrl: { type: String, default: "" },
     targetUrl: { type: String, default: "" },
+
+    env: { type: String, default: "" },
+    category: { type: String, default: "" },
 
     notes: String,
     tags: [String],

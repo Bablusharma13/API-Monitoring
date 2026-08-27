@@ -1,5 +1,6 @@
 import Incident from "./incident.model.js";
 import Api from "../apis/api.model.js";
+import { SLA_BREACH_MINUTES } from "../../config/sla.js";
 
 const toFilter = (val) => {
   const arr = val.split(",").map((v) => v.trim()).filter(Boolean);
@@ -114,12 +115,16 @@ export const getIncidentsSummary = async () => {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
   const [
     totalIncidents,
     activeIncidents,
     criticalIncidents,
     resolvedToday,
     incidentsLast30Days,
+    slaBreachAgg,
   ] = await Promise.all([
     Incident.countDocuments({}),
     Incident.countDocuments({ status: "ongoing" }),
@@ -144,15 +149,46 @@ export const getIncidentsSummary = async () => {
         },
       },
     ]),
+    Incident.aggregate([
+      {
+        $match: {
+          status: "resolved",
+          resolvedAt: { $gte: thirtyDaysAgo },
+        },
+      },
+      {
+        $addFields: {
+          slaThresholdMinutes: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: ["$severity", "critical"] },
+                  then: SLA_BREACH_MINUTES.critical,
+                },
+                {
+                  case: { $eq: ["$severity", "warning"] },
+                  then: SLA_BREACH_MINUTES.warning,
+                },
+                {
+                  case: { $eq: ["$severity", "info"] },
+                  then: SLA_BREACH_MINUTES.info,
+                },
+              ],
+              default: SLA_BREACH_MINUTES.warning,
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          $expr: { $gt: ["$duration", "$slaThresholdMinutes"] },
+        },
+      },
+      { $count: "count" },
+    ]),
   ]);
 
-  //NOTE: need to discuss sla breach logic
-
-  // const allIncidents = await Incident.find({}).select("duration").lean();
-  //
-  // const slaBreaches = allIncidents.filter(
-  //   (i) => i.duration && i.duration > 300,
-  // ).length;
+  const slaBreaches = slaBreachAgg.length > 0 ? slaBreachAgg[0].count : 0;
 
   const avgResolution =
     incidentsLast30Days.length > 0
@@ -165,6 +201,6 @@ export const getIncidentsSummary = async () => {
     criticalIncidents,
     resolvedToday,
     avgResolution: avgResolution || null,
-    slaBreaches: 0,
+    slaBreaches,
   };
 };

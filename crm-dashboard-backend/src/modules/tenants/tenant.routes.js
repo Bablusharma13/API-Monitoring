@@ -15,6 +15,7 @@ import {
   updateTenantOriginHandler,
   getEndpointSummary,
   getEndpointTenantMetrics,
+  getQuotaUsageHandler,
 } from "./tenant.controller.js";
 
 export const tenantRouter = express.Router();
@@ -22,6 +23,7 @@ export const tenantRouter = express.Router();
 tenantRouter.get("/summary", getTenantsSummaryHandler);
 tenantRouter.get("/fleet-summary", getFleetSummaryHandler);
 tenantRouter.get("/cards", getTenantCardsHandler);
+tenantRouter.get("/quota-usage", getQuotaUsageHandler);
 
 tenantRouter.get("/endpoint-explorer", getEndpointExplorer);
 tenantRouter.get("/dashboard", getTenantDashboardData);

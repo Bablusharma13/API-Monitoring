@@ -14,6 +14,7 @@ import {
   updateTenantOrigin,
   getEndpointSummaryByMethod,
   getEndpointTenantMetricsByMethod,
+  getQuotaUsage,
 } from "./tenant.service.js";
 
 import { successsResponse, errorResponse } from "../../utils/responses.js";
@@ -213,6 +214,15 @@ export const updateTenantOriginHandler = async (req, res) => {
   const { origin } = req.body;
   try {
     const data = await updateTenantOrigin(id, origin);
+    return successsResponse(res, data);
+  } catch (error) {
+    return errorResponse(res, error);
+  }
+};
+
+export const getQuotaUsageHandler = async (req, res) => {
+  try {
+    const data = await getQuotaUsage();
     return successsResponse(res, data);
   } catch (error) {
     return errorResponse(res, error);

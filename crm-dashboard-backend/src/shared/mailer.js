@@ -66,3 +66,45 @@ export const sendEmailNotification = async (emailData) => {
     return { success: false, message: error.message || "Email sending failed" };
   }
 };
+
+// to: array of email strings, subject: string, text: string, html: string
+export const sendAlertEmail = async ({ to, subject, text, html }) => {
+  const msResult = await sendEmailNotification({
+    uniqueName: "generic-alert",
+    project: "API",
+    to,
+    isDisclaimer: true,
+    priority: 2,
+    isNote: false,
+    subject,
+    title: subject,
+    text,
+    html,
+  });
+
+  if (msResult.success) {
+    console.log("sendAlertEmail: sent via EMAIL_MS_URL microservice");
+    return msResult;
+  }
+
+  console.warn(
+    "sendAlertEmail: EMAIL_MS_URL failed, falling back to direct SMTP:",
+    msResult.message,
+  );
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM,
+      to: to.join(","),
+      subject,
+      text,
+      html,
+    });
+
+    console.log("sendAlertEmail: sent via fallback SMTP transporter");
+    return { success: true, message: "Email sent successfully via SMTP fallback" };
+  } catch (error) {
+    console.error("sendAlertEmail: SMTP fallback failed:", error.message);
+    return { success: false, message: error.message || "Email sending failed" };
+  }
+};

@@ -8,6 +8,7 @@ import {
   recordPing,
   getCronJobSummary,
   getPingHistory,
+  getPingStats,
   runNow,
 } from "./cron-job.service.js";
 import { successsResponse, errorResponse } from "../../utils/responses.js";
@@ -95,6 +96,21 @@ export const getPingHistoryHandler = async (req, res, next) => {
     return successsResponse(res, result);
   } catch (err) {
     next(err);
+  }
+};
+
+export const getPingStatsHandler = async (req, res) => {
+  try {
+    const days = req.query.days ? Number(req.query.days) : 30;
+    const result = await getPingStats(req.params.id, days);
+    return successsResponse(
+      res,
+      result,
+      200,
+      "Ping stats retrieved successfully",
+    );
+  } catch (error) {
+    return errorResponse(res, error);
   }
 };
 

@@ -32,12 +32,28 @@ const getNextCronTime = (expression, from = new Date()) => {
   return dayjs(from).add(1, "minute").toDate();
 };
 
+const toFilter = (val) => {
+  const arr = val
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return arr.length === 1 ? arr[0] : { $in: arr };
+};
+
 const buildFilter = (query) => {
-  const { search = "", status, isPaused } = query;
+  const {
+    search = "",
+    status,
+    isPaused,
+    "filters[env]": env,
+    "filters[category]": category,
+  } = query;
   const filter = {};
   if (search) filter.name = { $regex: search, $options: "i" };
   if (status) filter.status = status;
   if (isPaused !== undefined) filter.isPaused = isPaused === "true";
+  if (env) filter.env = toFilter(env);
+  if (category) filter.category = toFilter(category);
   return filter;
 };
 
@@ -147,6 +163,7 @@ const recalcStats = async (cronJob) => {
       "stats.successRate30d": s30d.successRate,
       "stats.missedRuns30d": s30d.missedRuns,
       "stats.avgDuration30d": s30d.avgDuration,
+      "stats.totalRuns30d": pings.length,
       totalPings,
     };
   } catch {
@@ -164,6 +181,21 @@ const updatePingsToday = (cronJob) => {
     cronJob.pingsTodayDate = new Date();
   }
   cronJob.pingsToday += 1;
+};
+
+// ── Retention (delegates to the retention module; falls back to 90d) ────
+const getPingExpiresAt = async () => {
+  try {
+    const { getRetentionDays } = await import(
+      "../retention/retention.service.js"
+    );
+    const days = await getRetentionDays("ping_retention_days");
+    return dayjs()
+      .add(Number(days) || 90, "days")
+      .toDate();
+  } catch {
+    return dayjs().add(90, "days").toDate();
+  }
 };
 
 const pushToLast30 = (cronJob, pingData) => {
@@ -261,7 +293,7 @@ export const executeCronSchedule = async (cronJobId, targetUrl) => {
     startedAt: now,
     status: "running",
     type: "scheduled",
-    expiresAt: dayjs().add(90, "days").toDate(),
+    expiresAt: await getPingExpiresAt(),
   });
 
   cronJob.currentRunId = runId;
@@ -364,6 +396,7 @@ export const getAllCronJobs = async (query) => {
   const [total, jobs] = await Promise.all([
     CronJob.countDocuments(filter),
     CronJob.find(filter)
+      .populate("owner", "name image_url")
       .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
       .skip(skip)
       .limit(Number(limit))
@@ -510,7 +543,7 @@ export const recordPing = async (slug) => {
       type: "scheduled",
       delay,
       expectedAt,
-      expiresAt: dayjs().add(90, "days").toDate(),
+      expiresAt: await getPingExpiresAt(),
     });
   }
 
@@ -636,6 +669,52 @@ export const getPingHistory = async (cronJobId, query) => {
       hasNextPage: Number(page) < Math.ceil(total / Number(limit)),
       hasPrevPage: Number(page) > 1,
     },
+  };
+};
+
+export const getPingStats = async (cronJobId, days = 30) => {
+  const since = new Date(Date.now() - Number(days) * 24 * 60 * 60 * 1000);
+
+  const pings = await Ping.find({
+    cronJob: cronJobId,
+    startedAt: { $gte: since },
+  }).lean();
+
+  const totalRuns = pings.length;
+  const failCount = pings.filter((p) =>
+    ["failed", "timeout"].includes(p.status),
+  ).length;
+  const arrived = pings.filter((p) =>
+    ["success", "late"].includes(p.status),
+  ).length;
+  const successRate = totalRuns
+    ? Math.round((arrived / totalRuns) * 1000) / 10
+    : 100;
+
+  const durations = pings
+    .filter((p) => p.duration > 0)
+    .map((p) => p.duration)
+    .sort((a, b) => a - b);
+
+  const avgDurationMs = durations.length
+    ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length)
+    : 0;
+  const maxDurationMs = durations.length
+    ? durations[durations.length - 1]
+    : 0;
+  const p95DurationMs = durations.length
+    ? durations[
+        Math.min(durations.length - 1, Math.ceil(durations.length * 0.95) - 1)
+      ]
+    : 0;
+
+  return {
+    successRate,
+    failCount,
+    avgDurationMs,
+    maxDurationMs,
+    p95DurationMs,
+    totalRuns,
   };
 };
 

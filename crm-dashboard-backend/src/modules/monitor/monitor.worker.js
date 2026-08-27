@@ -6,6 +6,8 @@ import apiModel from "../apis/api.model.js";
 import checkModel from "../check/check.model.js";
 import { handleStatusChange } from "./monitor.service.js";
 import { syncCategoryStats } from "../categories/category.service.js";
+import { evaluateMetricAlerts } from "../alerts/alert.service.js";
+import { getRetentionDays } from "../retention/retention.service.js";
 
 export const startMonitorWorker = () => {
   const worker = new Worker(
@@ -59,6 +61,7 @@ export const startMonitorWorker = () => {
           responseTime: Date.now() - start,
           message: err.message,
           error: err.message,
+          errorCode: err.code || null,
         };
       }
 
@@ -66,8 +69,8 @@ export const startMonitorWorker = () => {
       const newStatus = computeStatus(result, api);
       const previousStatus = api.status.current;
 
-      await Promise.all([
-        writeCheck(api, result),
+      const [, statsResult] = await Promise.all([
+        writeCheck(api, result, newStatus),
         //NOTE: need to add this
         // writeLog(api, result),
         updateApiStats(api, result, newStatus),
@@ -75,6 +78,17 @@ export const startMonitorWorker = () => {
 
       if (api.category) {
         await syncCategoryStats(api.category);
+      }
+
+      // ── metric-based alert rules (latency / error-rate) ──
+      try {
+        const stats24h = statsResult?.stats24h;
+        await evaluateMetricAlerts(api, {
+          responseTimeMs: result.responseTime,
+          errorRatePct: 100 - (stats24h?.uptime ?? 100),
+        });
+      } catch (e) {
+        console.error(`evaluateMetricAlerts failed for ${api.name}:`, e.message);
       }
 
       // ── handle status change ─────────────
@@ -116,18 +130,37 @@ const computeStatus = (result, api) => {
   return "active";
 };
 
-const writeCheck = async (api, result) => {
+const getCheckStatus = (newStatus, result) => {
+  if (newStatus === "active") return "ok";
+  if (newStatus === "warning") return "warn";
+  const errorCode = result?.errorCode;
+  if (errorCode === "ECONNABORTED" || errorCode === "ETIMEDOUT") return "timeout";
+  return "error";
+};
+
+const writeCheck = async (api, result, newStatus) => {
   try {
+    let retentionDays = 90;
+    try {
+      const days = await getRetentionDays("check_retention_days");
+      if (typeof days === "number" && days > 0) retentionDays = days;
+    } catch (e) {
+      console.error(
+        "getRetentionDays failed, falling back to 90 days:",
+        e.message,
+      );
+    }
+
     await checkModel.create({
       api: api._id,
       apiName: api.name,
       checkedAt: new Date(),
-      status: result.success ? "ok" : "error",
+      status: getCheckStatus(newStatus, result),
       statusCode: result.statusCode,
       responseTime: result.responseTime,
       message: result.message,
       error: result.error || null,
-      expiresAt: dayjs().add(90, "days").toDate(),
+      expiresAt: dayjs().add(retentionDays, "days").toDate(),
     });
   } catch (e) {
     console.log("error", e.stack);
@@ -194,6 +227,8 @@ const updateApiStats = async (api, result, newStatus) => {
       "stats.uptime30d": stats30d.uptime,
       "stats.avgResponse30d": stats30d.avgResponse,
     });
+
+    return { stats24h };
   } catch (e) {
     console.log("error", e.stack);
   }

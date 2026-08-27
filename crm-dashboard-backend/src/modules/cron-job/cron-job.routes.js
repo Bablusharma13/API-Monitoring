@@ -8,6 +8,7 @@ import {
   toggleHandler,
   getSummaryHandler,
   getPingHistoryHandler,
+  getPingStatsHandler,
   recordPingHandler,
   runNowHandler,
 } from "./cron-job.controller.js";
@@ -22,6 +23,7 @@ cronJobRouter.post("/", createHandler);
 cronJobRouter.put("/:id", updateHandler);
 cronJobRouter.delete("/:id", deleteHandler);
 cronJobRouter.patch("/:id/toggle", toggleHandler);
+cronJobRouter.get("/:id/pings/summary", getPingStatsHandler);
 cronJobRouter.get("/:id/pings", getPingHistoryHandler);
 cronJobRouter.post("/:id/run", runNowHandler);
 

@@ -16,6 +16,12 @@ const TenantMetricSchema = new Schema(
     p99: { type: Number },
     errorRate: { type: Number, default: 0 },
     cpuPct: { type: Number, default: 0 },
+    // Optional saturation metrics — left undefined (no default) when not
+    // populated by an external writer, rather than defaulting to 0.
+    memPct: { type: Number },
+    dbPoolPct: { type: Number },
+    netPct: { type: Number },
+    diskPct: { type: Number },
     totalRequests: { type: Number, default: 0 },
     totalErrors: { type: Number, default: 0 },
   },

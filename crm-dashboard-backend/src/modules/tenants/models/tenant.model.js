@@ -20,6 +20,10 @@ const TenantSchema = new Schema(
       default: "starter",
     },
     userCount: { type: Number, default: 0 },
+    quota: {
+      requestsPerMonth: { type: Number, default: null },
+      rateLimitPerMinute: { type: Number, default: null },
+    },
   },
   { timestamps: true },
 );

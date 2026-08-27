@@ -178,6 +178,30 @@ export const syncCategoryStats = async (categoryId) => {
   }
 };
 
+export const updateCategory = async (id, data) => {
+  const category = await Category.findById(id);
+  if (!category) throw { message: "Category not found", statusCode: 404 };
+
+  const allowedFields = [
+    "name",
+    "description",
+    "color",
+    "owner",
+    "compliance",
+    "defaultAlertChannel",
+    "tags",
+    "isActive",
+  ];
+
+  allowedFields.forEach((field) => {
+    if (data[field] !== undefined) {
+      category[field] = data[field];
+    }
+  });
+
+  return await category.save();
+};
+
 export const deleteCategoryById = async (id) => {
   const category = await Category.findByIdAndDelete(id);
   if (!category) throw { message: "Category not found", statusCode: 404 };

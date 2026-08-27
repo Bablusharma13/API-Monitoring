@@ -4,6 +4,7 @@ import { cronSchedulerQueue } from "../../shared/queue.js";
 import {
   executeCronSchedule,
   checkOverdueJobs,
+  markAsMissing,
 } from "./cron-job.service.js";
 
 const CRON_CHECK_INTERVAL = 15_000; // 15 seconds
@@ -47,6 +48,22 @@ const createSchedulerWorker = () => {
       `[cron-scheduler] Job ${job?.id} failed after retries:`,
       err.message,
     );
+
+    // Only mark as missing once retries are exhausted (don't fire on every attempt)
+    const maxAttempts = job?.opts?.attempts ?? 1;
+    if (job && job.attemptsMade >= maxAttempts) {
+      const { cronJobId } = job.data || {};
+      if (cronJobId) {
+        try {
+          await markAsMissing(cronJobId, err.message);
+        } catch (markErr) {
+          console.error(
+            `[cron-scheduler] Failed to mark cron job ${cronJobId} as missing:`,
+            markErr.message,
+          );
+        }
+      }
+    }
   });
 
   return schedulerWorker;
