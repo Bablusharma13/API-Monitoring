@@ -18,6 +18,7 @@ import { useBulkDeleteCategoriesMutation } from "../hooks/query/useBulkDeleteCat
 import { useDeleteCategoryMutation } from "../hooks/query/useDeleteCategoryMutation";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { Categories_GROUP } from "../constants";
+import useCurrentUser from "../../../hooks/useCurrentUser";
 
 const FEED_ITEMS = [
   {
@@ -100,6 +101,8 @@ export const Categories = () => {
   const [rowToDelete, setRowToDelete] = useState(null);
   const [rowDeleteDialogOpen, setRowDeleteDialogOpen] = useState(false);
 
+  const { isAdmin } = useCurrentUser();
+
   const { mutateAsync: bulkDelete } = useBulkDeleteCategoriesMutation();
   const { mutateAsync: deleteCategory, isPending: isRowDeleting } =
     useDeleteCategoryMutation();
@@ -174,10 +177,12 @@ export const Categories = () => {
               }}
               isAction={true}
               actions={{
-                onDelete: (row) => {
-                  setRowToDelete(row);
-                  setRowDeleteDialogOpen(true);
-                },
+                ...(isAdmin && {
+                  onDelete: (row) => {
+                    setRowToDelete(row);
+                    setRowDeleteDialogOpen(true);
+                  },
+                }),
               }}
               updateSelectedRows={setSelectedRows}
               bulkActions={[
@@ -189,12 +194,16 @@ export const Categories = () => {
                       `categories-${new Date().toISOString().slice(0, 10)}.csv`,
                     ),
                 },
-                {
-                  action: "delete",
-                  onClick: () => {
-                    if (selectedRows.length) setDeleteDialogOpen(true);
-                  },
-                },
+                ...(isAdmin
+                  ? [
+                      {
+                        action: "delete",
+                        onClick: () => {
+                          if (selectedRows.length) setDeleteDialogOpen(true);
+                        },
+                      },
+                    ]
+                  : []),
               ]}
               onRowClick={setSelectedRow}
               showRowNumbers={false}

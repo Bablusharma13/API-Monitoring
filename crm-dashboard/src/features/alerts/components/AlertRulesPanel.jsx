@@ -10,6 +10,7 @@ import { AlertRuleFormModal } from "./AlertRuleFormModal";
 import { useGetAlertRulesQuery } from "../hooks/query/useGetAlertRulesQuery";
 import { useDeleteAlertRuleMutation } from "../hooks/query/useDeleteAlertRuleMutation";
 import { ALERT_RULES_GROUP, ALERT_RULES_FILTERS } from "../constants";
+import useCurrentUser from "../../../hooks/useCurrentUser";
 
 export const AlertRulesPanel = () => {
   const [pageIndex, setPageIndex] = useState(1);
@@ -22,6 +23,8 @@ export const AlertRulesPanel = () => {
   const [activeRule, setActiveRule] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState(null);
+
+  const { isAdmin } = useCurrentUser();
 
   const { mutate: deleteRule, isPending: isDeleting } =
     useDeleteAlertRuleMutation();
@@ -103,10 +106,12 @@ export const AlertRulesPanel = () => {
         isAction
         actions={{
           onEdit: openEdit,
-          onDelete: (row) => {
-            setRuleToDelete(row);
-            setDeleteOpen(true);
-          },
+          ...(isAdmin && {
+            onDelete: (row) => {
+              setRuleToDelete(row);
+              setDeleteOpen(true);
+            },
+          }),
         }}
         showRowNumbers={false}
       />

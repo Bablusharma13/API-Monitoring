@@ -43,6 +43,11 @@ import CronInventory from "./features/cronInventory/components/cronInventory";
 import JobHistory from "./features/cronJobHistory/components/JobHistory";
 import CronDetail from "./features/cronHeartbeat/components/CronDetails";
 import { ThemeAwareToaster } from "./components/ui/ThemeAwareToaster.jsx";
+import { MaintenanceWindows } from "./features/maintenanceWindows/components/MaintenanceWindows";
+import Transactions from "./features/transactions/components/Transactions";
+import TransactionRunHistory from "./features/transactions/components/TransactionRunHistory";
+import AuditLog from "./features/auditLog/components/AuditLog";
+import PublicStatusPage from "./pages/PublicStatusPage";
 
 function App() {
   const queryClient = new QueryClient();
@@ -123,9 +128,24 @@ function App() {
               <Route path="/active-alerts" element={<ActiveAlerts />} />
               <Route path="/slo-dashboard" element={<SLODashboard />} />
               <Route path="/user-activity" element={<UserActivity />} />
+
+              {/* NOTE: Transactions */}
+              <Route path="/transactions" element={<Transactions />} />
+              <Route
+                path="/transactions/:id/runs"
+                element={<TransactionRunHistory />}
+              />
+
+              {/* NOTE: Settings */}
+              <Route
+                path="/maintenance-windows"
+                element={<MaintenanceWindows />}
+              />
+              <Route path="/audit-log" element={<AuditLog />} />
             </Route>
             <Route path="/logout" element={<Logout />} />
           </Route>
+          <Route path="/status" element={<PublicStatusPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

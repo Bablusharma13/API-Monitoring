@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
 import FormModal from "../../../components/ui/FormModal";
 import UiInput from "../../../components/ui/Input";
 import UiSelect from "../../../components/ui/SingleSelect";
@@ -30,6 +31,7 @@ const emptyForm = {
   cooldownMinutes: 15,
   autoResolve: true,
   enabled: true,
+  escalation: [],
 };
 
 const idOf = (v) => v?._id ?? v;
@@ -52,6 +54,10 @@ const ruleToForm = (rule) => {
     cooldownMinutes: rule.cooldownMinutes ?? 15,
     autoResolve: rule.autoResolve ?? true,
     enabled: rule.enabled ?? true,
+    escalation: (rule.escalation || []).map((tier) => ({
+      afterMinutes: tier.afterMinutes ?? "",
+      channels: (tier.channels || []).map(idOf),
+    })),
   };
 };
 
@@ -121,6 +127,24 @@ export const AlertRuleFormModal = ({ open, onClose, rule }) => {
     [],
   );
 
+  const addEscalationTier = () =>
+    setForm((f) => ({
+      ...f,
+      escalation: [...f.escalation, { afterMinutes: "", channels: [] }],
+    }));
+  const removeEscalationTier = (i) =>
+    setForm((f) => ({
+      ...f,
+      escalation: f.escalation.filter((_, idx) => idx !== i),
+    }));
+  const updateEscalationTier = (i, field, val) =>
+    setForm((f) => ({
+      ...f,
+      escalation: f.escalation.map((t, idx) =>
+        idx === i ? { ...t, [field]: val } : t,
+      ),
+    }));
+
   const handleSubmit = () => {
     const errs = {};
     if (!form.name.trim()) errs.name = true;
@@ -153,6 +177,10 @@ export const AlertRuleFormModal = ({ open, onClose, rule }) => {
       cooldownMinutes: Number(form.cooldownMinutes) || 0,
       autoResolve: form.autoResolve,
       enabled: form.enabled,
+      escalation: form.escalation.map((tier) => ({
+        afterMinutes: Number(tier.afterMinutes) || 0,
+        channels: tier.channels,
+      })),
     };
 
     const onError = (error) =>
@@ -290,6 +318,53 @@ export const AlertRuleFormModal = ({ open, onClose, rule }) => {
           options={channelOptions}
           placeholder="Select notification channels…"
         />
+
+        <div>
+          <div className="text-[11.5px] text-gray-500 mb-1.5">
+            Escalation{" "}
+            <span className="text-gray-400">
+              (optional — notify more channels if still unresolved)
+            </span>
+          </div>
+          {form.escalation.map((tier, i) => (
+            <div key={i} className="flex gap-2 mb-2 items-center">
+              <div className="w-[110px] shrink-0">
+                <UiInput
+                  type="number"
+                  placeholder="After (min)"
+                  value={tier.afterMinutes}
+                  onChange={(e) =>
+                    updateEscalationTier(i, "afterMinutes", e.target.value)
+                  }
+                />
+              </div>
+              <div className="flex-1">
+                <MultiSelect
+                  value={tier.channels}
+                  onChange={(val) => updateEscalationTier(i, "channels", val)}
+                  options={channelOptions}
+                  placeholder="Escalate to…"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeEscalationTier(i)}
+                aria-label="Remove escalation tier"
+                className="w-[34px] h-[34px] flex items-center justify-center shrink-0 border border-gray-200 rounded-lg text-gray-400 hover:border-red-400 hover:text-red-500 transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addEscalationTier}
+            className="flex items-center gap-1.5 text-[12px] text-blue-600 hover:text-blue-700 mt-1"
+          >
+            <Plus size={14} />
+            Add escalation tier
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <UiInput

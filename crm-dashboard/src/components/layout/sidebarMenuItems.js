@@ -228,4 +228,30 @@ export const sidebarMenuItems = [
     href: "/user-activity",
     order: 5,
   },
+
+  {
+    _id: "transactions",
+    title: "Transactions",
+    slug: "transactions",
+    category: "transactions",
+    href: "/transactions",
+    order: 1,
+  },
+
+  {
+    _id: "maintenance-windows",
+    title: "Maintenance Windows",
+    slug: "maintenance-windows",
+    category: "settings",
+    href: "/maintenance-windows",
+    order: 1,
+  },
+  {
+    _id: "audit-log",
+    title: "Audit Log",
+    slug: "audit-log",
+    category: "settings",
+    href: "/audit-log",
+    order: 2,
+  },
 ];

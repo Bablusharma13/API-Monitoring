@@ -179,4 +179,14 @@ export const logColumns = [
       </span>
     ),
   },
+  {
+    id: "region",
+    accessor: "region",
+    name: "Region",
+    Header: "REGION",
+    group: "Request",
+    cell: (row) => (
+      <span className="text-[12.5px] text-gray-600">{row.region ?? "—"}</span>
+    ),
+  },
 ];

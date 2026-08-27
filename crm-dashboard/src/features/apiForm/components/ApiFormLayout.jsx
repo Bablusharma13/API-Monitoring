@@ -8,6 +8,7 @@ import Select from "../../../components/ui/SingleSelect";
 import { TextareaField } from "../../../components/ui/TextArea";
 import AvatarSelect from "../../../components/ui/AvatarSelect";
 import SkillsTagsInput from "../../../formComponents/SkillsTagsInput";
+import MultiSelect from "../../../formComponents/MultiSelect";
 import { InfoCard } from "../../../components/ui/InfoCard";
 import PageHeader from "../../../components/ui/PageHeader";
 import { Section } from "../../../components/ui/Section";
@@ -68,6 +69,7 @@ import {
   ShieldIcon,
   UsersIcon,
 } from "../../../components/ui/AppIcons";
+import useCurrentUser from "../../../hooks/useCurrentUser";
 
 // ─── Shared micro-components ──────────────────────────────────────────────────
 
@@ -372,6 +374,93 @@ const KVList = ({ rows, onChange, addLabel = "Add Row" }) => {
   );
 };
 
+/** Plain label + value display for server-computed (read-only) fields */
+const ReadOnlyField = ({ label, value }) => (
+  <div>
+    <FieldLabel>{label}</FieldLabel>
+    <p className="text-[13px] text-[#1c1f2e]">{value || "—"}</p>
+  </div>
+);
+
+const JSON_PATH_OPERATORS = [
+  { value: "equals", label: "equals" },
+  { value: "exists", label: "exists" },
+  { value: "contains", label: "contains" },
+  { value: "gt", label: "gt (>)" },
+  { value: "lt", label: "lt (<)" },
+];
+
+/** Repeatable rows for JSON path assertions: path / operator / expected value */
+const JsonPathChecksList = ({ rows, onChange }) => {
+  const add = () =>
+    onChange([...rows, { path: "", operator: "equals", expected: "" }]);
+  const remove = (i) => onChange(rows.filter((_, idx) => idx !== i));
+  const update = (i, field, val) =>
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
+
+  const inp =
+    "border border-[#e9ebf0] rounded-lg px-3 py-[7px] font-mono text-[12px] text-[#1c1f2e] " +
+    "outline-none bg-white focus:border-[#2563eb] focus:shadow-[0_0_0_3px_rgba(37,99,235,0.08)] transition-all placeholder:text-[#c2c8d4] w-full";
+
+  return (
+    <div>
+      {rows.map((row, i) => (
+        <div key={i} className="flex gap-2 mb-2 items-center">
+          <input
+            className={`${inp} flex-[1.5]`}
+            placeholder="$.data.status"
+            value={row.path}
+            onChange={(e) => update(i, "path", e.target.value)}
+          />
+          <select
+            className={`${inp} flex-1 font-sans cursor-pointer`}
+            value={row.operator}
+            onChange={(e) => update(i, "operator", e.target.value)}
+          >
+            {JSON_PATH_OPERATORS.map((op) => (
+              <option key={op.value} value={op.value}>
+                {op.label}
+              </option>
+            ))}
+          </select>
+          {row.operator !== "exists" && (
+            <input
+              className={`${inp} flex-[1.5]`}
+              placeholder="Expected value"
+              value={row.expected}
+              onChange={(e) => update(i, "expected", e.target.value)}
+            />
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="!w-[26px] !h-[26px] !min-w-[26px] !p-0 shrink-0 hover:!border-red-400 hover:!text-red-500"
+            icon={<Trash2 />}
+            iconSize={14}
+            aria-label="Remove row"
+            onClick={() => remove(i)}
+          />
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        icon={<Plus />}
+        iconSize={14}
+        className="mt-1 !text-[#2563eb]"
+        onClick={add}
+      >
+        Add JSON Path Check
+      </Button>
+    </div>
+  );
+};
+
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "—");
+
 /** Auth type selector tabs */
 const AuthTabs = ({ active, onChange }) => {
   const tabs = [
@@ -478,6 +567,7 @@ const DayBtn = ({ label, active, onClick }) => (
 export default function ApiFormLayout() {
   const { api: apiId } = useParams();
   const { data: apiData, isLoading, isError } = useApiDetailsQuery(apiId);
+  const { isAdmin } = useCurrentUser();
   const updateMutation = useUpdateApiMutation();
   const disableMutation = useDisableApiMutation();
   const deleteMutation = useDeleteApiMutation();
@@ -516,6 +606,16 @@ export default function ApiFormLayout() {
   const [monEnabled, setMonEnabled] = useState(true);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [loggingEnabled, setLoggingEnabled] = useState(true);
+  const [regions, setRegions] = useState([]);
+
+  // ── SSL Monitoring ──
+  const [sslEnabled, setSslEnabled] = useState(false);
+  const [sslCheckFrequency, setSslCheckFrequency] = useState("0 6 * * *");
+
+  // ── Assertions ──
+  const [assertionsEnabled, setAssertionsEnabled] = useState(false);
+  const [bodyContains, setBodyContains] = useState([]);
+  const [jsonPathChecks, setJsonPathChecks] = useState([]);
 
   // ── Authentication ──
   const [authType, setAuthType] = useState("none");
@@ -623,6 +723,18 @@ export default function ApiFormLayout() {
     setTimeoutLimit(String(apiData.monitoring?.timeout ?? "30000"));
     setExpectedStatus(String(apiData.monitoring?.expectedStatus ?? "200"));
     setRetryCount(String(apiData.monitoring?.retries ?? "3"));
+    setRegions(apiData.monitoring?.regions ?? []);
+    setSslEnabled(apiData.ssl?.enabled ?? false);
+    setSslCheckFrequency(apiData.ssl?.checkFrequency ?? "0 6 * * *");
+    setAssertionsEnabled(apiData.assertions?.enabled ?? false);
+    setBodyContains(apiData.assertions?.bodyContains ?? []);
+    setJsonPathChecks(
+      (apiData.assertions?.jsonPathChecks ?? []).map((c) => ({
+        path: c.path ?? "",
+        operator: c.operator ?? "equals",
+        expected: c.expected != null ? String(c.expected) : "",
+      })),
+    );
     setAuthType((apiData.auth?.method ?? "none").toLowerCase());
     setBearer(apiData.auth?.token ?? "");
     setAkHeader(apiData.auth?.apiKeyHeader ?? "X-API-Key");
@@ -718,6 +830,22 @@ export default function ApiFormLayout() {
     { value: "0 */6 * * *", label: "Every 6 hours" },
     { value: "0 0 * * *", label: "Daily" },
   ];
+  const regionOpts = [
+    { value: "us-east", label: "US East" },
+    { value: "us-west", label: "US West" },
+    { value: "eu-west", label: "EU West" },
+    { value: "ap-south", label: "AP South" },
+  ];
+  const sslFreqOpts = [
+    { value: "0 6 * * *", label: "Every day at 6:00 AM" },
+    { value: "0 */6 * * *", label: "Every 6 hours" },
+    { value: "0 0 * * 0", label: "Weekly (Sunday midnight)" },
+    { value: "custom", label: "Custom (cron expression)" },
+  ];
+  const isKnownSslFreq = sslFreqOpts.some(
+    (o) => o.value !== "custom" && o.value === sslCheckFrequency,
+  );
+  const sslFreqSelectValue = isKnownSslFreq ? sslCheckFrequency : "custom";
   const teamOpts = [
     { value: "payments", label: "Payments Team" },
     { value: "platform", label: "Platform Team" },
@@ -814,6 +942,22 @@ export default function ApiFormLayout() {
       timeout: Number(timeoutLimit),
       expectedStatus: Number(expectedStatus),
       retries: Number(retryCount),
+      regions,
+    },
+    ssl: {
+      enabled: sslEnabled,
+      checkFrequency: sslCheckFrequency,
+    },
+    assertions: {
+      enabled: assertionsEnabled,
+      bodyContains,
+      jsonPathChecks: jsonPathChecks
+        .filter((c) => c.path.trim())
+        .map((c) => ({
+          path: c.path.trim(),
+          operator: c.operator,
+          expected: c.expected,
+        })),
     },
     alertChannels: Object.entries(channels)
       .filter(([, v]) => v)
@@ -897,16 +1041,18 @@ export default function ApiFormLayout() {
             >
               Save Changes
             </UiButton>
-            <UiButton
-              variant="red"
-              size="lg"
-              icon={<Trash2 />}
-              iconSize={14}
-              loading={deleteMutation.isPending}
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              Delete
-            </UiButton>
+            {isAdmin && (
+              <UiButton
+                variant="red"
+                size="lg"
+                icon={<Trash2 />}
+                iconSize={14}
+                loading={deleteMutation.isPending}
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                Delete
+              </UiButton>
+            )}
           </div>
         }
       />
@@ -1048,6 +1194,24 @@ export default function ApiFormLayout() {
                 </div>
               </div>
 
+              <div className="mb-1">
+                <MultiSelect
+                  label="Regions"
+                  icon={<Globe />}
+                  value={regions}
+                  onChange={(val) => {
+                    setRegions(val);
+                    markDirty();
+                  }}
+                  options={regionOpts}
+                  placeholder="Select monitoring regions…"
+                  showSelectAll={false}
+                />
+                <HelperText>
+                  Run checks for this API from each selected region
+                </HelperText>
+              </div>
+
               {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4"> */}
               {/*   <Input */}
               {/*     label="Retry Count" */}
@@ -1097,6 +1261,84 @@ export default function ApiFormLayout() {
               {/*   checked={loggingEnabled} */}
               {/*   onChange={() => setLoggingEnabled(!loggingEnabled)} */}
               {/* /> */}
+            </InfoCard>
+          </Section>
+
+          {/* ── 2b. SSL MONITORING ────────────────────────────────────────────── */}
+          <Section className="mb-5">
+            <InfoCard icon={<ShieldIcon />} title="SSL Monitoring">
+              <ToggleRow
+                label="Enable SSL Certificate Monitoring"
+                sub="Periodically check this endpoint's TLS certificate for upcoming expiry"
+                checked={sslEnabled}
+                onChange={() => {
+                  setSslEnabled(!sslEnabled);
+                  markDirty();
+                }}
+              />
+
+              {sslEnabled && (
+                <div className="mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Select
+                      label="Check Frequency"
+                      icon={<Clock />}
+                      value={sslFreqSelectValue}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setSslCheckFrequency(v === "custom" ? "" : v);
+                        markDirty();
+                      }}
+                      options={sslFreqOpts}
+                      placeholder="Select frequency"
+                    />
+                    {sslFreqSelectValue === "custom" && (
+                      <Input
+                        label="Cron Expression"
+                        icon={<Calendar />}
+                        value={sslCheckFrequency}
+                        onChange={(e) => {
+                          setSslCheckFrequency(e.target.value);
+                          markDirty();
+                        }}
+                        placeholder="0 6 * * *"
+                      />
+                    )}
+                  </div>
+
+                  {apiData?.ssl && (
+                    <>
+                      <Divider />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <ReadOnlyField
+                          label="Last Checked"
+                          value={fmtDate(apiData.ssl.lastCheckedAt)}
+                        />
+                        <ReadOnlyField
+                          label="Expires At"
+                          value={fmtDate(apiData.ssl.expiresAt)}
+                        />
+                        <ReadOnlyField
+                          label="Days Until Expiry"
+                          value={
+                            apiData.ssl.daysUntilExpiry != null
+                              ? String(apiData.ssl.daysUntilExpiry)
+                              : "—"
+                          }
+                        />
+                        <ReadOnlyField
+                          label="Issuer"
+                          value={apiData.ssl.issuer}
+                        />
+                        <ReadOnlyField
+                          label="Status"
+                          value={cap(apiData.ssl.status)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </InfoCard>
           </Section>
 
@@ -1246,6 +1488,52 @@ export default function ApiFormLayout() {
               {/*     <p className="mt-1 text-[11.5px] text-red-500">{jsonErr}</p> */}
               {/*   )} */}
               {/* </div> */}
+            </InfoCard>
+          </Section>
+
+          {/* ── 5. ASSERTIONS ─────────────────────────────────────────────────── */}
+          <Section className="mb-5">
+            <InfoCard icon={<CheckCircleIcon />} title="Assertions">
+              <ToggleRow
+                label="Enable Response Assertions"
+                sub="Fail a check when the response body doesn't match what's expected"
+                checked={assertionsEnabled}
+                onChange={() => {
+                  setAssertionsEnabled(!assertionsEnabled);
+                  markDirty();
+                }}
+              />
+
+              {assertionsEnabled && (
+                <div className="mt-4 flex flex-col gap-4">
+                  <div>
+                    <SkillsTagsInput
+                      label="Body Contains"
+                      skills={bodyContains}
+                      onChange={(vals) => {
+                        setBodyContains(vals);
+                        markDirty();
+                      }}
+                      placeholder="Type text and press Enter…"
+                    />
+                    <HelperText>
+                      Check fails if the response body is missing any of these
+                      substrings
+                    </HelperText>
+                  </div>
+
+                  <div>
+                    <FieldLabel>JSON Path Checks</FieldLabel>
+                    <JsonPathChecksList
+                      rows={jsonPathChecks}
+                      onChange={(rows) => {
+                        setJsonPathChecks(rows);
+                        markDirty();
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </InfoCard>
           </Section>
 

@@ -388,16 +388,20 @@ const CATEGORY_LABELS = {
   "tenant-monitoring": "Tenant Monitoring",
   logs: "Logs & Data",
   alerts: "Alerts & Notifications",
+  settings: "Settings",
+  transactions: "Transactions",
 };
 
 // Section ordering
 const SECTION_ORDER = [
   "api-monitoring",
+  "transactions",
   "cron-jobs",
   "tenant-monitoring",
   "logs",
   "alerts",
   "analytics",
+  "settings",
   "workspace",
   "product",
   "sales & marketing",

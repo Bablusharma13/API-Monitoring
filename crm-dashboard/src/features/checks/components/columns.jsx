@@ -121,4 +121,12 @@ export const checksColumns = [
       <span className="line-clamp-1 text-gray-500">{row.error ?? "—"}</span>
     ),
   },
+  {
+    id: "region",
+    accessor: "region",
+    name: "Region",
+    Header: "REGION",
+    group: "Identity",
+    cell: (row) => <span>{row.region ?? "—"}</span>,
+  },
 ];

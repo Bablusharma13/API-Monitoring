@@ -159,6 +159,27 @@ export const alertsColumns = [
     ),
   },
   {
+    id: "escalatedTiers",
+    accessor: "escalatedTiers",
+    name: "Escalated",
+    Header: "ESCALATED",
+    group: "Notifications",
+    width: 100,
+    cell: (row) => {
+      const tiers = row.escalatedTiers || [];
+      if (!tiers.length) return null;
+      return (
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 text-[11px] font-medium"
+          title={`Escalated through ${tiers.length} tier${tiers.length === 1 ? "" : "s"}`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+          {tiers.length}
+        </span>
+      );
+    },
+  },
+  {
     id: "notifiedChannels",
     accessor: "notifiedChannels",
     name: "Notified",

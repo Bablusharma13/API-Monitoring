@@ -34,6 +34,7 @@ import { Button } from "../../../components/ui/Button";
 import { AlertDialog } from "../../../components/ui/AlertDialog";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "../../../components/ui/ProfileAvtar";
+import useCurrentUser from "../../../hooks/useCurrentUser";
 
 const SmallIcon = ({ children }) => (
   <svg
@@ -82,6 +83,17 @@ const incidentHex = (count) =>
 const riskHex = (score) =>
   score < 40 ? COLOR_GREEN : score < 70 ? COLOR_AMBER : COLOR_RED;
 
+const sslHex = (ssl) => {
+  if (!ssl) return COLOR_GRAY;
+  if (ssl.status === "critical" || ssl.status === "error") return COLOR_RED;
+  if (ssl.status === "warning") return COLOR_AMBER;
+  const days = ssl.daysUntilExpiry;
+  if (days == null) return COLOR_GRAY;
+  if (days <= 7) return COLOR_RED;
+  if (days <= 30) return COLOR_AMBER;
+  return COLOR_GREEN;
+};
+
 const StatusDownIcon = ({ color, width = 16, height = 16 }) => (
   <SharedStatusDownIcon
     width={width}
@@ -107,6 +119,14 @@ const IncidentIcon = ({ color, width = 16, height = 16 }) => (
   />
 );
 const RiskIcon = ({ color, width = 16, height = 16 }) => (
+  <SharedShieldIcon
+    width={width}
+    height={height}
+    stroke={color}
+    strokeWidth={2}
+  />
+);
+const SslIcon = ({ color, width = 16, height = 16 }) => (
   <SharedShieldIcon
     width={width}
     height={height}
@@ -466,6 +486,7 @@ export function ApiDetails() {
   const { api: apiId } = useParams();
   const navigate = useNavigate();
   const { data: apiData, isLoading, isError } = useApiDetailsQuery(apiId);
+  const { isAdmin } = useCurrentUser();
   const disableMutation = useDisableApiMutation();
   const deleteMutation = useDeleteApiMutation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -533,6 +554,16 @@ export function ApiDetails() {
   const incidentHexColor = incidentHex(incidentCount);
   const riskHexColor = riskHex(riskScore);
 
+  const sslEnabled = !!apiData?.ssl?.enabled;
+  const sslDaysUntilExpiry = apiData?.ssl?.daysUntilExpiry;
+  const sslHexColor = sslHex(apiData?.ssl);
+  const sslValue =
+    sslDaysUntilExpiry != null
+      ? `${sslDaysUntilExpiry}d`
+      : apiData?.ssl?.status
+        ? cap(apiData.ssl.status)
+        : "—";
+
   const stats = {
     currentStatus: {
       value: statusDisplay,
@@ -553,6 +584,11 @@ export function ApiDetails() {
       value: String(riskScore),
       label: "Risk Score",
       color: riskHexColor,
+    },
+    ssl: {
+      value: sslValue,
+      label: "SSL Certificate Expiry",
+      color: sslHexColor,
     },
   };
 
@@ -892,16 +928,18 @@ export function ApiDetails() {
             >
               {isApiActive ? "Disable" : "Enable"}
             </Button>
-            <Button
-              variant="red"
-              size="lg"
-              icon={<Trash2 />}
-              iconSize={14}
-              loading={deleteMutation.isPending}
-              onClick={handleDelete}
-            >
-              Delete
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="red"
+                size="lg"
+                icon={<Trash2 />}
+                iconSize={14}
+                loading={deleteMutation.isPending}
+                onClick={handleDelete}
+              >
+                Delete
+              </Button>
+            )}
           </div>
         }
       />
@@ -936,6 +974,15 @@ export function ApiDetails() {
             countColor={`text-[${stats.riskScore.color}]`}
             iconColor={`text-[${stats.riskScore.color}]`}
           />
+          {sslEnabled && (
+            <StatCard3
+              icon={<SslIcon color={stats.ssl.color} />}
+              count={stats.ssl.value}
+              title={stats.ssl.label}
+              countColor={`text-[${stats.ssl.color}]`}
+              iconColor={`text-[${stats.ssl.color}]`}
+            />
+          )}
         </div>
       </Section>
 

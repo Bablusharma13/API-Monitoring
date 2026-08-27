@@ -69,6 +69,32 @@ export const LOGS_FILTERS = [
       { value: "timeout", label: "Timeout" },
     ],
   },
+  {
+    id: "region",
+    name: "Region",
+    filterName: "region",
+    icon: (
+      <svg
+        width="11"
+        height="11"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+      </svg>
+    ),
+    options: [
+      { value: "default", label: "Default" },
+      { value: "us-east", label: "US East" },
+      { value: "us-west", label: "US West" },
+      { value: "eu-west", label: "EU West" },
+      { value: "ap-south", label: "AP South" },
+    ],
+  },
 ];
 
 // Quick time-window control wired to the real filters[dateFrom] param —

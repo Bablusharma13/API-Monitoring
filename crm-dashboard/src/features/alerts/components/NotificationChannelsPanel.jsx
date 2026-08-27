@@ -13,6 +13,7 @@ import {
   NOTIFICATION_CHANNELS_GROUP,
   NOTIFICATION_CHANNELS_FILTERS,
 } from "../constants";
+import useCurrentUser from "../../../hooks/useCurrentUser";
 
 export const NotificationChannelsPanel = () => {
   const [pageIndex, setPageIndex] = useState(1);
@@ -25,6 +26,8 @@ export const NotificationChannelsPanel = () => {
   const [activeChannel, setActiveChannel] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [channelToDelete, setChannelToDelete] = useState(null);
+
+  const { isAdmin } = useCurrentUser();
 
   const { mutate: deleteChannel, isPending: isDeleting } =
     useDeleteNotificationChannelMutation();
@@ -112,10 +115,12 @@ export const NotificationChannelsPanel = () => {
         isAction
         actions={{
           onEdit: openEdit,
-          onDelete: (row) => {
-            setChannelToDelete(row);
-            setDeleteOpen(true);
-          },
+          ...(isAdmin && {
+            onDelete: (row) => {
+              setChannelToDelete(row);
+              setDeleteOpen(true);
+            },
+          }),
         }}
         showRowNumbers={false}
       />
