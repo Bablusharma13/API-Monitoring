@@ -5,32 +5,29 @@ import { Apis } from "./features/apis/components/Dashboard";
 import { ApplicationLayout } from "./components/layout/ApplicationLayout";
 import PrivateRoute from "./components/layout/PrivateLayout";
 import { Incidents } from "./features/incidents/components/Incidents";
-import LogExplorer from "./pages/LogExplorer";
-import LogDetail from "./pages/LogDetailTrace";
-import Alerts from "./pages/Alerts";
-import ArchiveBrowser from "./pages/ArchiveBrowser";
-import BufferDashboard from "./pages/BufferDashboard";
-import PipelineMonitor from "./pages/PipelineMonitor";
-import RetentionRules from "./pages/RetentionRules";
-import StorageTiers from "./pages/StorageTiers";
-import NotificationChannel from "./pages/NotificationChannel";
-import AlertRules from "./pages/AlertRules";
-import QuotaLimits from "./pages/QuotaLimits";
-import Saturation from "./pages/Saturation";
-import Traffic from "./pages/Traffic";
-import Errors from "./pages/ErrorsPage";
+import LogExplorer from "./features/logExplorer/components/LogExplorer";
+import LogDetail from "./features/logExplorer/components/LogDetailTrace";
+import Alerts from "./features/alerts/components/Alerts";
+import { PipelineMonitor } from "./features/pipelineMonitor/components/PipelineMonitor";
+import RetentionRules from "./features/retentionRules/components/RetentionRules";
+import { StorageTiers } from "./features/storageTiers/components/StorageTiers";
+import NotificationChannel from "./features/alerts/components/NotificationChannel";
+import AlertRules from "./features/alerts/components/AlertRules";
+import QuotaLimits from "./features/quotaLimits/components/QuotaLimits";
+import { Saturation } from "./features/saturation/components/Saturation";
+import Traffic from "./features/traffic/components/Traffic";
+import Errors from "./features/errorsAnalytics/components/ErrorsPage";
 import UserDetail from "./pages/UserDetail";
 import RequestLog from "./pages/RequestLog";
-import ActiveAlerts from "./pages/ActiveAlerts";
-import SLODashboard from "./pages/SloDashboard";
+import ActiveAlerts from "./features/alerts/components/ActiveAlerts";
+import { SloDashboard as SLODashboard } from "./features/sloDashboard/components/SloDashboard";
 import GlobalDashboard from "./pages/GlobalDashboard";
-import Latency from "./pages/Latency";
-import UserActivity from "./pages/UserActivity";
+import Latency from "./features/latency/components/Latency";
+import { UserActivity } from "./features/userActivity/components/UserActivity";
 import TenantDetail from "./pages/TenantDetail";
 import EndpointDetail from "./pages/EndpointDetail";
 import EndpointExplorer from "./pages/EndpointExplorer";
 import TenantOverview from "./pages/TenantOverview";
-import TraceDetail from "./pages/TraceDetail";
 import Login from "./pages/Login";
 
 import { Categories } from "./features/categories/components/categories";
@@ -110,8 +107,6 @@ function App() {
               <Route path="/log-explorer" element={<LogExplorer />} />
               <Route path="/log-detail-trace" element={<LogDetail />} />
               <Route path="/alerts" element={<Alerts />} />
-              <Route path="/archive-browser" element={<ArchiveBrowser />} />
-              <Route path="/buffer-dashboard" element={<BufferDashboard />} />
               <Route path="/pipeline-monitor" element={<PipelineMonitor />} />
               <Route path="/retention-rules" element={<RetentionRules />} />
               <Route path="/storage-tiers" element={<StorageTiers />} />
@@ -128,7 +123,6 @@ function App() {
               <Route path="/active-alerts" element={<ActiveAlerts />} />
               <Route path="/slo-dashboard" element={<SLODashboard />} />
               <Route path="/user-activity" element={<UserActivity />} />
-              <Route path="/trace-detail" element={<TraceDetail />} />
             </Route>
             <Route path="/logout" element={<Logout />} />
           </Route>

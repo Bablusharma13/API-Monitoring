@@ -202,6 +202,106 @@ export const exportTenantsToCsv = (rows, filename = "tenants-export.csv") => {
   URL.revokeObjectURL(url);
 };
 
+const LOG_CSV_COLUMNS = [
+  { header: "Log ID", path: "id" },
+  { header: "Source", path: "source" },
+  {
+    header: "Timestamp",
+    path: "timestamp",
+    format: (v) => (v ? new Date(v).toLocaleString() : ""),
+  },
+  { header: "Target", path: "target" },
+  { header: "Method", path: "method" },
+  { header: "Status Code", path: "statusCode" },
+  { header: "Latency (ms)", path: "latencyMs" },
+  { header: "Status", path: "status" },
+  { header: "Message", path: "message" },
+];
+
+export const exportLogsToCsv = (rows, filename = "logs-export.csv") => {
+  const header = LOG_CSV_COLUMNS.map((c) => escape(c.header)).join(",");
+  const body = rows.map((row) =>
+    LOG_CSV_COLUMNS.map((col) => {
+      const raw = get(row, col.path);
+      return escape(col.format ? col.format(raw) : raw);
+    }).join(",")
+  );
+  const csv = [header, ...body].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const CRON_JOB_CSV_COLUMNS = [
+  { header: "ID", path: "id" },
+  { header: "Name", path: "name" },
+  { header: "Cron Expression", path: "cron" },
+  { header: "Frequency", path: "cronHuman" },
+  { header: "Status", path: "status" },
+  { header: "Environment", path: "env" },
+  { header: "Category", path: "category" },
+  { header: "Owner", path: "owner" },
+  { header: "Last Run", path: "lastRunLabel" },
+  { header: "Next Run", path: "nextRunLabel" },
+  { header: "30d Uptime (%)", path: "uptime30" },
+  { header: "30d Runs", path: "runs30" },
+  { header: "Enabled", path: "enabled", format: (v) => (v ? "Yes" : "No") },
+];
+
+export const exportCronJobsToCsv = (rows, filename = "cron-inventory-export.csv") => {
+  const header = CRON_JOB_CSV_COLUMNS.map((c) => escape(c.header)).join(",");
+  const body = rows.map((row) =>
+    CRON_JOB_CSV_COLUMNS.map((col) => {
+      const raw = get(row, col.path);
+      return escape(col.format ? col.format(raw) : raw);
+    }).join(",")
+  );
+  const csv = [header, ...body].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const PING_RUN_CSV_COLUMNS = [
+  { header: "Run ID", path: "runId" },
+  {
+    header: "Started",
+    path: "started",
+    format: (v) => (v ? new Date(v).toLocaleString() : ""),
+  },
+  { header: "Outcome", path: "outcome" },
+  { header: "Duration (ms)", path: "durationMs" },
+  { header: "Triggered By", path: "trigger" },
+  { header: "Retries", path: "retries" },
+  { header: "Error", path: "error" },
+];
+
+export const exportPingRunsToCsv = (rows, filename = "job-history-export.csv") => {
+  const header = PING_RUN_CSV_COLUMNS.map((c) => escape(c.header)).join(",");
+  const body = rows.map((row) =>
+    PING_RUN_CSV_COLUMNS.map((col) => {
+      const raw = get(row, col.path);
+      return escape(col.format ? col.format(raw) : raw);
+    }).join(",")
+  );
+  const csv = [header, ...body].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 export const exportToCsv = (rows, filename = "export.csv") => {
   const header = CSV_COLUMNS.map((c) => escape(c.header)).join(",");
   const body = rows.map((row) =>

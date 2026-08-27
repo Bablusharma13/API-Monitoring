@@ -123,22 +123,6 @@ export const sidebarMenuItems = [
     order: 1,
   },
   {
-    _id: "archive-browser",
-    title: "Archive Browser",
-    slug: "archive-browser",
-    category: "logs",
-    href: "/archive-browser",
-    order: 2,
-  },
-  {
-    _id: "buffer-dashboard",
-    title: "Buffer Dashboard",
-    slug: "buffer-dashboard",
-    category: "logs",
-    href: "/buffer-dashboard",
-    order: 3,
-  },
-  {
     _id: "pipeline-monitor",
     title: "Pipeline Monitor",
     slug: "pipeline-monitor",
